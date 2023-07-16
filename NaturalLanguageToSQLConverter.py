@@ -1,6 +1,6 @@
 from connection import Connection
 import pandas as pd
-from sqlalchemy import MetaData, Table
+from sqlalchemy import MetaData, Table, text
 from dotenv import load_dotenv
 import os
 import openai
@@ -18,7 +18,8 @@ class SQLConverter:
         table_prompt = self.get_table_data_for_prompt(data)
 
         combined_prompt = self.combine_prompts(table_prompt, message)
-        return self.get_response(combined_prompt)
+        response =  self.get_response(combined_prompt)
+        return self.get_query_result(response)
         
     def get_user_table_data(self):
         metadata = MetaData()
@@ -34,7 +35,7 @@ class SQLConverter:
     def get_table_data_for_prompt(self, df):
         prompt = '''### sqlite SQL table, with its properties:
         #
-        # users({})
+        # user({})
         #
         '''.format(",".join(str(x) for x in df.columns))
             
@@ -58,3 +59,23 @@ class SQLConverter:
         )
 
         return response
+
+    from sqlalchemy import text
+
+    def get_query_result(self, response):
+        query = response["choices"][0]["text"]
+        if query.startswith(" "):
+            query = "SELECT" + query
+
+        conn = self.engine.connect()
+        result = conn.execute(text(query))
+        rows = result.fetchall()
+
+        column_names = result.keys()
+
+        formatted_data = [dict(zip(column_names, row)) for row in rows]
+
+        result.close()
+        conn.close()
+
+        return formatted_data
