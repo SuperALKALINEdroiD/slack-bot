@@ -19,4 +19,4 @@ slash command is still there though
 For CI/CD
 I was unable to deploy the bot. It is currently hosted locally using ngrok's tunneling. I had this project in a virtual en. I was unable to push venv and hence deploying became tedious. I tried for hours on netlify but build only failed.
 
-
+I am pumped to hear about next rounds and work with you guys.
