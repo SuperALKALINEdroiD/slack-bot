@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from flask import Flask
+from flask import Flask, request
 from slackeventsapi import SlackEventAdapter
 import datetime
 from util import Util
@@ -9,6 +9,10 @@ from job import Job
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timedelta
 import traceback
+import json
+from NaturalLanguageToSQLConverter import SQLConverter
+import pandas as pd
+import tabulate
 
 from sqlalchemy.orm import declarative_base
 Base = declarative_base()
@@ -20,11 +24,13 @@ app = Flask(__name__)
 slack_event_adapter = SlackEventAdapter(signing_secret, '/slack/events', app)
 
 utility = Util()
-client = utility.create_slack_client()
+create_client = utility.create_slack_client()
+client = utility.get_slack_client()
 bot_id = utility.get_bot_id()
 
 connection = Connection('database.db')
 engine = connection.get_engine()
+sql = SQLConverter()
 
 try:
     Base.metadata.create_all(bind=engine)
@@ -41,7 +47,24 @@ def message(request):
     text = event.get('text')
 
     if user_id != bot_id:
-        utility.send_message(client, channel_id, text)
+        response = sql.contact_api(text)
+
+        df = pd.DataFrame(response)
+        markdown_table = tabulate.tabulate(df, headers='keys', tablefmt='pipe', numalign='right')
+        try:
+            sent = client.files_upload(
+                channels=channel_id,
+                content=markdown_table,
+                filename="query_result_table.md",
+                title="Query Result Table"
+            )
+
+            if sent["ok"]:
+                print("Table sent successfully!")
+            else:
+                utiltiy.send_message(client, channel_id, "ERR UPLOADING TABLE")
+        except:
+            pass
 
 @slack_event_adapter.on('member_joined_channel')
 def joined_channel(request):
@@ -70,6 +93,13 @@ def joined_channel(request):
         session.add(joined)
         session.commit()
         session.close()
+
+@app.route('/slack/ask', methods=['POST'])
+def slash_command():
+    message_text = request.form['text']
+    print(message_text)
+
+    return json.loads(json.dumps({'text': response}))
 
 if __name__ == '__main__':
     app.run(debug=True) # automatically reruns
