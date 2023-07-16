@@ -9,3 +9,6 @@
 
 # env file with tokens
 .env
+
+# Local Netlify folder
+.netlify
